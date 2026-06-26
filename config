@@ -1,0 +1,50 @@
+#!/bin/sh
+OS="Carbon"
+DIST="trixie"
+VER="13.0"
+PREP="Cahyo Hertanto"
+
+set -e
+
+lb config noauto \
+    --distribution "$DIST" \
+    --architecture amd64 \
+    --apt-recommends 'false' \
+    --apt-source-archives 'false' \
+    --apt-indices 'false' \
+    --apt-method "copy" \
+    --apt-filesystem "file:///home/cahyo/repo" \
+    --checksums 'md5' \
+    --chroot-squashfs-compression-level 19 \
+    --chroot-squashfs-compression-type zstd \
+    --clean \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --debian-installer live \
+    --debian-installer-gui true \
+    --mirror-binary "http://deb.debian.org/debian/" \
+    --mirror-binary-security "https://security.debian.org/debian-security" \
+    --mirror-bootstrap "https://deb.debian.org/debian" \
+    --memtest 'memtest86+' \
+    --debootstrap-options "--variant=minbase --include=apt-transport-https,ca-certificates,git,curl,wget,openssl" \
+    --debconf-frontend "noninteractive" \
+    --swap-file-size 4096 \
+    --firmware-binary true \
+    --firmware-chroot true \
+    --initramfs live-boot \
+    --interactive true \
+    --image-name "$OS"-"$DIST" \
+    --iso-application "$OS" \
+    --iso-preparer "$PREP" \
+    --iso-publisher "$OS"-"$DIST" GNU/Linux \
+    --iso-volume "$OS"-"$DIST"-"$VER" \
+    --binary-images iso-hybrid \
+    --uefi-secure-boot auto \
+    --updates 'true' \
+    --security 'true' \
+    --source 'false' \
+    --bootappend-live "boot=live components config splash" \
+    --win32-loader 'false' \
+    --zsync false \
+    "${@}"
+    
+    #    --linux-flavours 'amd64' \
