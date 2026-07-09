@@ -1,5 +1,139 @@
-#!/bin/sh
+#!/bin/bash
 
-set -e
+# Kernel Build Script - Carbon Kernel
+# Versi Lengkap & Terkoreksi
+# Author: Claude Code
+# Description: Membangun custom Linux kernel, patching, konfigurasi, kompilasi, & packaging .deb
 
-lb build noauto "${@}" 2>&1 | tee build.log
+# --- Konfigurasi ---
+LOCAL_SOURCE_FILE="/home/cahyo/Kernel/linux-source-6.12.tar.xz"
+KERNEL_VERSION="6.12"
+BORE_PATCH_DIR="/home/cahyo/Kernel/bore/patches/stable/linux-6.12-bore" # Menggunakan sub-folder yang sesuai dengan versi kernel 6.12
+LOCAL_VERSION="-carbon"
+BUILD_DIR="/home/cahyo/Kernel/kernel-build"
+LOG_FILE="/home/cahyo/Kernel/kernel-build/kernel_build.log"
+NUM_CORES=$(nproc)
+
+# --- Fungsi Bantu ---
+# Log dengan timestamp dan redirect ke log file
+log() {
+    local msg="[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+    echo -e "\e[34m$msg\e[0m"
+    echo "$msg" >> "$LOG_FILE"
+}
+
+error() {
+    local msg="[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1"
+    echo -e "\e[31m$msg\e[0m" >&2
+    echo "$msg" >> "$LOG_FILE"
+    exit 1
+}
+
+check_dependencies() {
+    log "Memeriksa dependensi build..."
+    local deps=("gcc" "make" "bc" "bison" "flex" "libssl-dev" "libelf-dev" "zstd" "libnuma-dev" "dwarves" "pkg-config" "cpio" "wget" "xz-utils")
+    for dep in "${deps[@]}"; do
+        # Cek apakah command tersedia ATAU paket terinstal via dpkg -s
+        if ! command -v "$dep" >/dev/null 2>&1 && ! dpkg -s "$dep" >/dev/null 2>&1; then
+            error "Dependensi '$dep' tidak ditemukan. Silakan instal terlebih dahulu."
+        fi
+    done
+}
+
+# --- Cek Root ---
+# Sudo check removed by user request.
+
+# Pastikan direktori log ada
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Pastikan log file bisa ditulis
+touch "$LOG_FILE"
+chmod 644 "$LOG_FILE"
+
+# --- Langkah 1: Setup ---
+setup_env() {
+    log "Langkah 1: Menyiapkan lingkungan..."
+    check_dependencies
+
+    mkdir -p "$BUILD_DIR"
+    cd "$BUILD_DIR" || error "Gagal masuk ke $BUILD_DIR."
+    log "Lingkungan build siap di $BUILD_DIR"
+}
+
+# --- Langkah 2: Ekstraksi ---
+extract_source() {
+    log "Langkah 2: Mengekstrak source code..."
+    [ -f "$LOCAL_SOURCE_FILE" ] || error "File source tidak ditemukan di $LOCAL_SOURCE_FILE"
+
+    rm -rf "$BUILD_DIR/linux-source-"*
+    tar -xf "$LOCAL_SOURCE_FILE" -C "$BUILD_DIR" || error "Gagal mengekstrak tarball."
+
+    KERNEL_DIR=$(find "$BUILD_DIR" -maxdepth 1 -type d -name "linux-*" | head -n 1)
+    [ -d "$KERNEL_DIR" ] || error "Direktori kernel tidak ditemukan."
+
+    cd "$KERNEL_DIR" || error "Gagal masuk ke direktori $KERNEL_DIR."
+    log "Source berhasil diekstrak ke: $(pwd)"
+}
+
+# --- Langkah 3: Patch & Konfigurasi ---
+apply_bore_patch() {
+    log "Langkah 3: Menerapkan patch Bore..."
+    # Memastikan patch diterapkan dengan benar dari folder stable
+    find "$BORE_PATCH_DIR" -name "*.patch" | while read -r PATCH_FILE; do
+        log "Menerapkan: $(basename "$PATCH_FILE")"
+        patch -p1 < "$PATCH_FILE" >> "$LOG_FILE" 2>&1 || error "Gagal menerapkan patch $(basename "$PATCH_FILE")"
+    done
+}
+
+clean_kernel() {
+    log "Langkah 3b: Membersihkan direktori build (clean & mrproper)..."
+    make clean >> "$LOG_FILE" 2>&1
+    make mrproper >> "$LOG_FILE" 2>&1
+}
+
+configure_kernel() {
+    log "Langkah 3c: Konfigurasi Kernel..."
+    cp /boot/config-$(uname -r) .config
+    make olddefconfig >> "$LOG_FILE" 2>&1
+
+    # Tweak performa & BORE
+    scripts/config --enable LOCALVERSION --set-str LOCALVERSION "${LOCAL_VERSION}"
+    scripts/config --enable CPU_FREQ_GOV_SCHEDUTIL --set-str CPU_FREQ_DEFAULT_GOV schedutil
+    scripts/config --enable PREEMPT_VOLUNTARY
+
+    # Konfigurasi tambahan (BORE, dll)
+    scripts/config --enable SCHED_BORE
+    scripts/config --enable PREEMPT_DYNAMIC
+    scripts/config --enable HZ_1000
+    scripts/config --disable DEBUG_INFO
+
+    scripts/config --enable BLK_DEV_SD --enable NVME_CORE --enable BLK_DEV_NVME=m
+    scripts/config --enable BTRFS_FS=m --enable EXT4_FS --enable XFS_FS=m --enable NTFS3=m
+    scripts/config --enable TCP_CONG_BBR --enable NET_SCH_FQ --enable ZRAM
+    scripts/config --enable ZRAM_COMPRESSOR_ZSTD
+    scripts/config --set-val ZRAM_COMPRESSOR_ZSTD y
+
+    make olddefconfig >> "$LOG_FILE" 2>&1
+    log "Konfigurasi selesai."
+}
+
+# --- Langkah 4: Kompilasi & Packaging ---
+compile_kernel() {
+    log "Langkah 4: Kompilasi kernel..."
+    # Menggunakan deb-pkg agar bisa diinstal via dpkg
+    make -j$NUM_CORES bindeb-pkg >> "$LOG_FILE" 2>&1 || error "Kompilasi gagal. Lihat $LOG_FILE untuk detail."
+
+    mkdir -p "$BUILD_DIR/out"
+    mv ../*.deb "$BUILD_DIR/out/" 2>/dev/null
+    log "Paket .deb berhasil dibuat di: $BUILD_DIR/out"
+}
+
+# --- Eksekusi Utama ---
+log "Memulai proses build..."
+setup_env
+extract_source
+apply_bore_patch
+clean_kernel
+configure_kernel
+compile_kernel
+log "Proses build selesai sepenuhnya!"
