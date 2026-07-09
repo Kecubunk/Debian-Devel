@@ -9,7 +9,7 @@
 LOCAL_SOURCE_FILE="/home/cahyo/Kernel/linux-source-6.12.tar.xz"
 KERNEL_VERSION="6.12"
 BORE_PATCH_DIR="/home/cahyo/Kernel/bore/patches/stable/linux-6.12-bore" # Menggunakan sub-folder yang sesuai dengan versi kernel 6.12
-LOCAL_VERSION="-carbon"
+LOCAL_VERSION="-carbon-$(date +%Y%m%d-%H%M)"
 BUILD_DIR="/home/cahyo/Kernel/kernel-build"
 LOG_FILE="/home/cahyo/Kernel/kernel-build/kernel_build.log"
 NUM_CORES=$(nproc)
@@ -18,7 +18,7 @@ NUM_CORES=$(nproc)
 # Log dengan timestamp dan redirect ke log file
 log() {
     local msg="[$(date +'%Y-%m-%d %H:%M:%S')] $1"
-    echo -e "\e[34m$msg\e[0m"
+    echo -e "\e[33m$msg\e[0m"
     echo "$msg" >> "$LOG_FILE"
 }
 
