@@ -77,10 +77,6 @@ dconf-service
 debconf
 debconf-i18n
 debian-archive-keyring
-debian-faq
-debian-reference-common
-debian-reference-es
-debian-reference-it
 debianutils
 dhcpcd-base
 dictionaries-common
@@ -149,9 +145,6 @@ fonts-droid-fallback
 fonts-noto-mono
 fonts-unifont
 fonts-urw-base35
-fortune-mod
-fortunes-debian-hints
-fortunes-it
 g++
 g++-14
 g++-14-x86-64-linux-gnu
@@ -213,7 +206,6 @@ init-system-helpers
 initramfs-tools
 initramfs-tools-bin
 initramfs-tools-core
-inorwegian
 intel-media-va-driver
 intel-microcode
 ipp-usb
@@ -851,4 +843,5 @@ xz-utils
 zhcon
 zhcon-data
 zlib1g
+yt-dlp
 zstd
