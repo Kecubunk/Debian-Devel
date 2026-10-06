@@ -1,0 +1,131 @@
+#!/bin/bash
+# =============================================================================
+#  build-gnome — Build script untuk carbon-gnome .deb
+#  Usage:
+#    ./build-gnome              → pakai versi dari DEBIAN/control
+#    ./build-gnome 8.1.0        → override versi
+#    ./build-gnome 8.1.0 -o ~/Releases  → output ke folder custom
+# =============================================================================
+set -euo pipefail
+
+C='\033[1;36m'; G='\033[1;32m'; Y='\033[1;33m'; R='\033[1;31m'; N='\033[0m'; D='\033[2m'
+info()  { printf "${C}[INFO]${N}  %s\n" "$*"; }
+ok()    { printf "${G}[OK]${N}    %s\n" "$*"; }
+warn()  { printf "${Y}[WARN]${N}  %s\n" "$*"; }
+die()   { printf "${R}[ERROR]${N} %s\n" "$*" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Lokasi
+# ---------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PKG_DIR="$SCRIPT_DIR/carbon-gnome"
+CONTROL="$PKG_DIR/DEBIAN/control"
+
+[ -d "$PKG_DIR" ]  || die "Direktori paket tidak ditemukan: $PKG_DIR"
+[ -f "$CONTROL" ]  || die "File control tidak ditemukan: $CONTROL"
+
+# ---------------------------------------------------------------------------
+# Parse argumen
+# ---------------------------------------------------------------------------
+VERSION_OVERRIDE=""
+OUTPUT_DIR="$SCRIPT_DIR"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -o|--output)
+            shift
+            OUTPUT_DIR="${1:?--output butuh path}"
+            ;;
+        -h|--help)
+            printf "Usage: %s [VERSION] [-o OUTPUT_DIR]\n" "$(basename "$0")"
+            printf "  VERSION      Versi .deb (contoh: 8.1.0). Default: ambil dari DEBIAN/control\n"
+            printf "  -o, --output Direktori output .deb. Default: direktori script\n"
+            exit 0
+            ;;
+        -*)
+            die "Opsi tidak dikenal: $1  (gunakan -h untuk bantuan)"
+            ;;
+        *)
+            if [ -z "$VERSION_OVERRIDE" ]; then
+                VERSION_OVERRIDE="$1"
+            else
+                die "Argumen berlebih: $1"
+            fi
+            ;;
+    esac
+    shift
+done
+
+# ---------------------------------------------------------------------------
+# Tentukan versi
+# ---------------------------------------------------------------------------
+CURRENT_VERSION="$(grep -m1 '^Version:' "$CONTROL" | awk '{print $2}')"
+
+if [ -n "$VERSION_OVERRIDE" ]; then
+    VERSION="$VERSION_OVERRIDE"
+    info "Versi override: ${VERSION}  (semula: ${CURRENT_VERSION})"
+else
+    VERSION="$CURRENT_VERSION"
+    info "Versi dari control: ${VERSION}"
+fi
+
+# Validasi format versi (angka + titik, boleh suffix seperti -1)
+if ! echo "$VERSION" | grep -qE '^[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9]+)?$'; then
+    die "Format versi tidak valid: '$VERSION'  (contoh yang valid: 8.1.0 atau 8.1.0-1)"
+fi
+
+# ---------------------------------------------------------------------------
+# Ambil metadata dari control
+# ---------------------------------------------------------------------------
+PACKAGE="$(grep -m1 '^Package:' "$CONTROL" | awk '{print $2}')"
+ARCH="$(grep -m1 '^Architecture:' "$CONTROL" | awk '{print $2}')"
+
+OUTPUT_FILENAME="${PACKAGE}_${VERSION}_${ARCH}.deb"
+OUTPUT_PATH="$OUTPUT_DIR/$OUTPUT_FILENAME"
+
+printf "\n"
+printf "${D}  Paket   : %s${N}\n" "$PACKAGE"
+printf "${D}  Versi   : %s${N}\n" "$VERSION"
+printf "${D}  Arch    : %s${N}\n" "$ARCH"
+printf "${D}  Output  : %s${N}\n\n" "$OUTPUT_PATH"
+
+# ---------------------------------------------------------------------------
+# Update versi di DEBIAN/control jika berbeda
+# ---------------------------------------------------------------------------
+if [ "$VERSION" != "$CURRENT_VERSION" ]; then
+    info "Mengupdate Version di DEBIAN/control: ${CURRENT_VERSION} → ${VERSION}"
+    sed -i "s/^Version:.*/Version: ${VERSION}/" "$CONTROL"
+fi
+
+# ---------------------------------------------------------------------------
+# Validasi permission DEBIAN scripts
+# ---------------------------------------------------------------------------
+info "Memeriksa permission DEBIAN scripts..."
+for script in postinst postrm prerm preinst; do
+    f="$PKG_DIR/DEBIAN/$script"
+    [ -f "$f" ] || continue
+    if [ ! -x "$f" ]; then
+        warn "$script tidak executable — memperbaiki..."
+        chmod 755 "$f"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# Buat output dir jika belum ada
+# ---------------------------------------------------------------------------
+mkdir -p "$OUTPUT_DIR"
+
+# ---------------------------------------------------------------------------
+# Build .deb
+# ---------------------------------------------------------------------------
+info "Membangun .deb..."
+dpkg-deb --build --root-owner-group "$PKG_DIR" "$OUTPUT_PATH"
+
+# ---------------------------------------------------------------------------
+# Selesai
+# ---------------------------------------------------------------------------
+SIZE="$(du -sh "$OUTPUT_PATH" | cut -f1)"
+printf "\n"
+ok "Build selesai!"
+printf "  File : %s\n" "$OUTPUT_PATH"
+printf "  Size : %s\n\n" "$SIZE"
