@@ -1,6 +1,5 @@
 format = """
 [](#3B4252)\
-$python\
 $username\
 [](bg:#434C5E fg:#3B4252)\
 $directory\
@@ -17,7 +16,14 @@ $java\
 $julia\
 $nodejs\
 $nim\
+$python\
+$lua\
+$php\
 $rust\
+[](fg:#86BBD8 bg:#06969A)\
+$shell\
+[](fg:#06969A bg:#06969A)\
+[](fg:#06969A bg:#86BBD8)\
 [](fg:#86BBD8 bg:#06969A)\
 $docker_context\
 [](fg:#06969A bg:#33658A)\
@@ -25,10 +31,7 @@ $time\
 [ ](fg:#33658A)\
 """
 command_timeout = 5000
-# Disable the blank line at the start of the prompt
-# add_newline = false
 
-# You can also replace your username with a neat symbol like  to save some space
 [username]
 show_always = true
 style_user = "bg:#3B4252"
@@ -41,23 +44,28 @@ format = "[ $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
-# Here is how you can shorten some long paths by text replacement
-# similar to mapped_locations in Oh My Posh:
 [directory.substitutions]
-"Documents" = " "
+"Documents" = "󰈙 "
 "Downloads" = " "
 "Music" = " "
 "Pictures" = " "
-# Keep in mind that the order matters. For example:
-# "Important Documents" = "  "
-# will not be replaced, because "Documents" was already substituted before.
-# So either put "Important Documents" before "Documents" or use the substituted version:
-# "Important  " = "  "
+
+# --- CUSTOM BASH DENGAN FORMAT PEMBERSIH TEKS BAWAAN ---
+#[bash]
+#command = "echo \" v${BASH_VERSION%%(*}\""
+#style = "fg:black bg:#86BBD8"
+#format = "[ $output ]($style)"
+#when = true
+
+[shell]
+disabled = false
+style ="fg:black bg:#06969A"
+format = '[   Bash($version) ]($style)'
 
 [c]
 symbol = " "
-style = "bg:#86BBD8"
-format = '[ $symbol ($version) ]($style)'
+style = "fg:black bg:#86BBD8"
+format = '[ $symbol ]($style)'
 
 [docker_context]
 symbol = " "
@@ -114,6 +122,7 @@ style = "bg:#86BBD8"
 format = '[ $symbol ($version) ]($style)'
 
 [python]
+symbol = " "
 style = "bg:#3B4252"
 format = '[(\($virtualenv\) )]($style)'
 
@@ -122,8 +131,18 @@ symbol = ""
 style = "bg:#86BBD8"
 format = '[ $symbol ($version) ]($style)'
 
+[php]
+symbol = " "
+style = "fg:black bg:#86BBD8"
+format = '[ $symbol ($version) ]($style)'
+
+[lua]
+symbol = "󰢱 "
+style = "fg:black bg:#86BBD8"
+format = '[ $symbol ($version) ]($style)'
+
 [time]
 disabled = false
-time_format = "%R" # Hour:Minute Format
+time_format = "%R"
 style = "bg:#33658A"
 format = '[  $time ]($style)'
